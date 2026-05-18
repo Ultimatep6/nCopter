@@ -56,7 +56,9 @@ class BodyFixed:
             if CM.__class__.__name__ != "EarthFixed":
                 raise TypeError("CM must be an EarthFixed object")
 
-            vec_BF = rotation_matrix @ (objB.vec - CM.vec)  # pyright: ignore[reportAttributeAccessIssue]
+            vec_BF = rotation_matrix @ (
+                objB.vec - CM.vec
+            )  # pyright: ignore[reportAttributeAccessIssue]
         else:
             vec_BF = rotation_matrix @ objB.vec
 
@@ -184,3 +186,15 @@ class BodyFixed:
     @property
     def _flag_list(self):
         return self.__flag_list
+
+    @property
+    def x(self):
+        return self.vec[0]
+
+    @property
+    def y(self):
+        return self.vec[1]
+
+    @property
+    def z(self):
+        return self.vec[2]

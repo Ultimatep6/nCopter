@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import Tuple
-from quad_sim.references.bodyFixed         import      BodyFixed
+from quad_sim.references.bodyFixed import BodyFixed
 
 
 class AllocatorBase(ABC):
 
     @abstractmethod
-    def allocate(self, thrust_torques: Tuple[BodyFixed, BodyFixed]) -> list[float]:
+    def allocate(
+        self, thrust_torques: Tuple[BodyFixed, BodyFixed], n_motors: int
+    ) -> list[float]:
         """
         Calculate the motor RPMs required to achieve the desired thrust and torques.
 
@@ -16,7 +18,3 @@ class AllocatorBase(ABC):
         :rtype: list[float]
         """
         pass
-
-    
-
-    

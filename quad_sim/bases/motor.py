@@ -7,19 +7,23 @@ class MotorBase(ABC):
     """
     Base class for motor models in the drone simulation. This class defines the required attributes and methods that any specific motor model must implement.
     """
+
     def __init__(self, id: str, spin_direction: int, position: BodyFixed):
         if not isinstance(id, str):
             raise TypeError(f"id must be a string, got {type(id)}")
         if not isinstance(spin_direction, int) or spin_direction not in (-1, 1):
-            raise ValueError(f"spin_direction must be an integer of either +1 (clockwise) or -1 (counterclockwise), got {spin_direction}")
+            raise ValueError(
+                f"spin_direction must be an integer of either +1 (clockwise) or -1 (counterclockwise), got {spin_direction}"
+            )
         if not isinstance(position, BodyFixed):
-            raise TypeError(f"position must be a BodyFixed object, got {type(position)}")
-            
-        
+            raise TypeError(
+                f"position must be a BodyFixed object, got {type(position)}"
+            )
+
         self._iD = id
         self._spin_direction = spin_direction
         self._position = position
-        self.theta = 0.0  # Initial angle of the propeller (in radians)
+        self._theta = 0.0  # Initial angle of the propeller (in radians)
 
     @property
     def iD(self) -> str:
@@ -27,33 +31,33 @@ class MotorBase(ABC):
         The unique identifier for the motor. This should be a string that distinguishes this motor from others in the simulation.
         """
         return self._iD
-    
+
     @property
     def spin_direction(self) -> int:
         """
         The spin direction of the motor. This should be an integer where +1 represents a clockwise rotation and -1 represents a counterclockwise rotation.
-        
+
         :return: The spin direction of the motor.
         :rtype: int
         """
         return self._spin_direction
-    
+
     @property
     def position(self) -> BodyFixed:
         """
         The position of the motor in the body-fixed reference frame. This should be a BodyFixed object representing the motor's location relative to the drone's center of mass.
-        
+
         :return: The position of the motor in the body-fixed frame.
         :rtype: BodyFixed
         """
         return self._position
-        
+
     @abstractmethod
-    def compute_forces(self) -> tuple[BodyFixed,BodyFixed]:
+    def compute_forces(self) -> tuple[BodyFixed, BodyFixed]:
         """
         Must calculate the thrust and moments caused by the propellers (acting through the center of the propeller) in the BodyFrame.
         Do not include moment around drone CG
-        
+
         :return: Returns the thrust and moment vectors
         :rtype: tuple[BodyFixed, BodyFixed]
         """
@@ -69,13 +73,13 @@ class MotorBase(ABC):
         pass
 
     @abstractmethod
-    def _generate_propeller_tips(self) -> dict[str,BodyFixed]:
+    def _generate_propeller_tips(self) -> dict[str, BodyFixed]:
         """
         Generate the initial positions of the propeller tips in the body-fixed reference frame.
         This method should be implemented by subclasses to return the coordinates of each propeller tip,
         identified by a string key (e.g., propeller name or index), mapped to a BodyFixed object representing
         its position relative to the motor's body frame.
-        
+
         :return: Tip_ID and its respective position in the BodyFrame
         :rtype: dict[str, BodyFixed]
         """
@@ -92,7 +96,7 @@ class MotorBase(ABC):
         pass
 
     @abstractmethod
-    def locate_propeller_tips(self) -> dict[str,BodyFixed]:
+    def locate_propeller_tips(self) -> dict[str, BodyFixed]:
         """
         Locate the positions of the propeller tips in the body-fixed reference frame.
         This method should be implemented by subclasses to return the coordinates of each propeller tip,
@@ -101,4 +105,4 @@ class MotorBase(ABC):
 
         :return: A dictionary mapping propeller identifiers to their positions in the body-fixed frame.
         :rtype: dict[str,BodyFixed]
-        """    
+        """

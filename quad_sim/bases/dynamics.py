@@ -91,7 +91,7 @@ class DynamicsBase(ABC):
         :return: A tuple containing the linear acceleration and angular acceleration of the drone.
         :rtype: tuple[BodyFixed, BodyFixed]
         """
-        a = compute_aB(self.mass,F,state.omega,state.vel)  # Linear acceleration using Newton's second law
+        a = compute_aB(self.mass,F,state.omega,state.velocity)  # Linear acceleration using Newton's second law
         alpha = compute_alphaB(self.inertia_tensor,M,state.omega)  # Angular acceleration using Euler's rotation equations
         q_rate = compute_q_rate(state.quaternion, state.omega)  # Quaternion rate of change based on current angular velocity
         return a, alpha, q_rate
