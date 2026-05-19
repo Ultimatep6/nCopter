@@ -30,10 +30,10 @@ DRONE_COLOR = np.array([1.0, 0.8, 0.2], dtype=np.float32)
 CIRCLE_SEGMENTS = 32
 CIRCLE_RADIUS_FACTOR = 0.02
 LINE_RADIUS_FACTOR = 0.003
-AXIS_SCALE_FACTOR = 1.5
+AXIS_SCALE_FACTOR = 1.2
 AXIS_DIVISOR = 10.0
 
-INDICATOR_RADIUS = 0.3
+INDICATOR_RADIUS = 0.2
 
 MOVING_AXIS_X_AMP = 3.0
 MOVING_AXIS_Y_AMP = 2.0
@@ -42,6 +42,16 @@ MOVING_AXIS_Y_FREQ = 0.7
 MOVING_AXIS_Z_AMP = 3.0
 MOVING_AXIS_ROT_SPEED = 1.2
 MESH_SCALE_FACTOR = 0.001
+
+MAX_BODIES = 16
+MAX_ARROWS = 3
+CYLINDER_SEGMENT = 24
+
+ARROW_SEGMENTS = 32
+SHAFT_RADIUS = 0.04
+SHAFT_HEIGHT = 0.6
+HEAD_RADIUS = 0.10
+HEAD_HEIGHT = 0.2
 
 FOG_DENSITY = 0.025
 GRID_LINE_ALPHA = 1.0
@@ -79,7 +89,7 @@ class SimulationRoom(mglw.WindowConfig):
         self.current_camera_index = 0
 
         self._load_all_shaders()
-        self._setup_grid_program()
+        self._setup_grid_geometry()
         self._setup_cameras()
         self._setup_axis()
         self._setup_drone_simulation()
@@ -89,12 +99,6 @@ class SimulationRoom(mglw.WindowConfig):
         self.grid_program = self.load_program(
             vertex_shader=os.path.join(SHADER_DIR, "sim_grid.vert"),
             fragment_shader=os.path.join(SHADER_DIR, "sim_grid.frag"),
-        )
-
-        # ----------------------- AXIS PROGRAM
-        self.axis_program = self.load_program(
-            vertex_shader=os.path.join(SHADER_DIR, "sim_axis.vert"),
-            fragment_shader=os.path.join(SHADER_DIR, "sim_axis.frag"),
         )
 
         # ----------------------- MODEL PROGRAM
@@ -113,6 +117,23 @@ class SimulationRoom(mglw.WindowConfig):
         self.cylinder_program = self.load_program(
             vertex_shader=os.path.join(SHADER_DIR, "sim_cylinder_beam.vert"),
             fragment_shader=os.path.join(SHADER_DIR, "sim_cylinder_beam.frag"),
+            defines={
+                "SEGMENTS": CYLINDER_SEGMENT,
+                "MAX_INSTANCES": MAX_BODIES,
+            },
+        )
+        # ------------------------ AXIS PROGRAM
+        self.axis_program = self.load_program(
+            vertex_shader=os.path.join(SHADER_DIR, "sim_arrow.vert"),
+            fragment_shader=os.path.join(SHADER_DIR, "sim_arrow.frag"),
+            defines={
+                "SEGMENTS": ARROW_SEGMENTS,
+                "MAX_INSTANCES": MAX_ARROWS,
+                "SHAFT_RADIUS": SHAFT_RADIUS,
+                "SHAFT_HEIGHT": SHAFT_HEIGHT,
+                "HEAD_RADIUS": HEAD_RADIUS,
+                "HEAD_HEIGHT": HEAD_HEIGHT,
+            },
         )
 
     def _setup_drone_simulation(self):
@@ -157,10 +178,6 @@ class SimulationRoom(mglw.WindowConfig):
         print(
             f"Drone mesh: {len(mesh_data['vertices'])} vertices, {self.drone_index_count} indices"
         )
-
-    def _setup_grid_program(self):
-
-        self._setup_grid_geometry()
 
     def _setup_grid_geometry(self, wall_direction=1):
         half_size = self.room_size * 0.5
@@ -284,66 +301,13 @@ class SimulationRoom(mglw.WindowConfig):
         self.grid_camera.target = np.array(self.room_center, dtype=np.float32)
 
     def _setup_axis(self):
-
-        from vizcore.meshes.arrow import build_axis_arrow
-        from vizcore.utils import get_rot_matrix, X_AXIS, Y_AXIS
-
-        arrow_verts, arrow_idxs = build_axis_arrow(
-            shaft_radius=0.02,
-            shaft_height=0.5,
-            head_radius=0.06,
-            head_height=0.1,
-            segments=16,
-        )
-
-        def rotate_arrow(verts, axis):
-            if axis == "x":
-                return verts @ get_rot_matrix(np.pi / 2, Y_AXIS, dim=True).T
-            elif axis == "y":
-                return verts @ get_rot_matrix(-np.pi / 2, X_AXIS, dim=True).T
-            else:
-                return verts
-
-        x_verts = rotate_arrow(arrow_verts, "x")
-        y_verts = rotate_arrow(arrow_verts, "y")
-        z_verts = rotate_arrow(arrow_verts, "z")
-
-        n_x = len(x_verts)
-        n_y = len(y_verts)
-        n_z = len(z_verts)
-
-        all_verts = np.concatenate([x_verts, y_verts, z_verts], axis=0)
-        all_colors = np.concatenate(
-            [
-                np.tile(AXIS_RED, (n_x, 1)),
-                np.tile(AXIS_GREEN, (n_y, 1)),
-                np.tile(AXIS_BLUE, (n_z, 1)),
-            ],
-            axis=0,
-        )
-
-        all_idxs = np.concatenate(
-            [
-                arrow_idxs,
-                arrow_idxs + n_x,
-                arrow_idxs + n_x + n_y,
-            ],
-            axis=0,
-        ).astype(np.int32)
-
-        self.vbo_axis_vert = self.ctx.buffer(all_verts[:, :3].astype("f4"))
-        self.vbo_axis_color = self.ctx.buffer(all_colors.astype("f4"))
-        self.ibo_axis = self.ctx.buffer(all_idxs)
-
-        self.axis_vao = self.ctx.vertex_array(
-            self.axis_program,
-            [
-                (self.vbo_axis_vert, "3f", "in_vert"),
-                (self.vbo_axis_color, "3f", "in_color"),
-            ],
-            index_buffer=self.ibo_axis,
-        )
-
+        self.axis_vao = self.ctx.vertex_array(self.axis_program, [])
+        self.axis_instance_matrices = np.zeros((MAX_ARROWS, 4, 4), dtype=np.float32)
+        self.axis_instance_colors = np.zeros((MAX_ARROWS, 3), dtype=np.float32)
+        self.axis_instance_colors[0] = AXIS_RED
+        self.axis_instance_colors[1] = AXIS_GREEN
+        self.axis_instance_colors[2] = AXIS_BLUE
+        self.axis_vert_count = 12 * ARROW_SEGMENTS
         self._build_circle_geometry()
         self._build_cylinder_geometry()
 
@@ -560,17 +524,29 @@ class SimulationRoom(mglw.WindowConfig):
 
         # ------------------------------ AXIS SETUP
         axis_scale = (self.room_size / AXIS_DIVISOR) * AXIS_SCALE_FACTOR
-        self.axis_program["u_scale"].write(np.array([axis_scale], dtype="f4").tobytes())
-        self.axis_program["u_vp"].write(vp.astype("f4").T.tobytes())
-
-        identity = np.eye(3, dtype=np.float32)
-        self.axis_program["u_rotation"].write(identity.T.tobytes())
-
-        self.axis_program["u_offset"].write(
-            np.array([0.0, 0.0, 0.0], dtype=np.float32).tobytes()
+        self.axis_instance_matrices[0] = get_model_matrix(
+            sx=axis_scale, sy=axis_scale, sz=axis_scale, rz=-np.pi / 2
         )
-        self.axis_program["u_use_override"].write(np.array([0], dtype="i4").tobytes())
-        self.axis_vao.render(moderngl.TRIANGLES)
+        self.axis_instance_matrices[1] = get_model_matrix(
+            sx=axis_scale, sy=axis_scale, sz=axis_scale
+        )
+        self.axis_instance_matrices[2] = get_model_matrix(
+            sx=axis_scale, sy=axis_scale, sz=axis_scale, rx=+np.pi / 2
+        )
+
+        self.axis_program["u_vp"].write(vp.astype("f4").T.tobytes())
+        self.axis_program["u_models"].write(
+            self.axis_instance_matrices.transpose(0, 2, 1)
+            .ravel()
+            .astype("f4")
+            .tobytes()
+        )
+        self.axis_program["u_colors"].write(
+            self.axis_instance_colors.astype("f4").tobytes()
+        )
+        self.axis_vao.render(
+            moderngl.TRIANGLES, self.axis_vert_count, instances=MAX_ARROWS
+        )
 
         # ---------------------------- MODEL SETUP
         rotation = self._quaternion_to_rotation_matrix(drone_q)
